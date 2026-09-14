@@ -10,6 +10,7 @@ Datos: UCI Student Performance (Cortez & Silva, 2008)
 https://archive.ics.uci.edu/dataset/320/student+performance
 """
 import io
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -78,13 +79,29 @@ def niv(var, x): return NIVELES.get(var, {}).get(x, str(x))
 def f(x, d=2): return f"{x:.{d}f}".replace(".", ",")
 def pf(p): return "< 0,001" if p < 0.001 else f"= {f(p, 3)}"
 
+UCI_URL = "https://archive.ics.uci.edu/static/public/320/student+performance.zip"
+
+@st.cache_data(show_spinner="Descargando el conjunto de datos de UCI…")
+def _descargar_uci():
+    """Trae student-por.csv del repositorio de UCI si no está junto a la app."""
+    import io as _io, zipfile, ssl, urllib.request
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    req = urllib.request.Request(UCI_URL, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=60, context=ctx) as r:
+        z = zipfile.ZipFile(_io.BytesIO(r.read()))
+    with z.open("student-por.csv") as fh:
+        return pd.read_csv(fh, sep=";")
+
 @st.cache_data
 def cargar_datos(archivo=None):
-    if archivo is None:
-        df = pd.read_csv("student-por.csv", sep=";")
-    else:
-        df = pd.read_csv(archivo, sep=None, engine="python")
-    return df
+    if archivo is not None:
+        return pd.read_csv(archivo, sep=None, engine="python")
+    local = Path(__file__).parent / "student-por.csv"
+    if local.exists():
+        return pd.read_csv(local, sep=";")
+    return _descargar_uci()
 
 def ic_media(s, alpha):
     n = len(s); m = s.mean(); se = s.std(ddof=1) / np.sqrt(n)

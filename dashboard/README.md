@@ -23,8 +23,25 @@ streamlit run app.py
 ```
 
 ## Publicar en Streamlit Community Cloud (gratis)
-1. Subir esta carpeta a un repositorio público de GitHub (app.py, requirements.txt,
-   student-por.csv y la carpeta .streamlit/).
+1. Subir esta carpeta a un repositorio público de GitHub. **Deben quedar los cuatro
+   elementos**, incluida la carpeta oculta `.streamlit/`:
+
+   ```
+   repo/
+   ├── app.py
+   ├── requirements.txt
+   ├── student-por.csv
+   └── .streamlit/
+       └── config.toml      <-- carpeta oculta: sin ella la app se ve con el tema oscuro por defecto
+   ```
+
+   GitHub Desktop y la subida por arrastre suelen ignorar las carpetas que empiezan
+   por punto. Si eso pasa, cree el archivo desde la web de GitHub: "Add file" →
+   "Create new file" → escriba `.streamlit/config.toml` como nombre (la barra crea
+   la carpeta) → pegue el contenido del archivo local → "Commit".
+
+   Si falta `student-por.csv`, la app lo descarga sola del repositorio de UCI, así
+   que funcionará igual; pero subirlo evita depender de la conexión.
 2. Entrar a https://share.streamlit.io con la cuenta de GitHub.
 3. "New app" → elegir el repositorio, rama `main` y archivo `app.py` → "Deploy".
 4. En dos o tres minutos la app queda en una URL pública del tipo
@@ -33,4 +50,3 @@ streamlit run app.py
 ## Datos
 Cortez, P., y Silva, A. (2008). Using data mining to predict secondary school student
 performance. EUROSIS. https://archive.ics.uci.edu/dataset/320/student+performance
-# Proyecto_Estad-stica_Inferencial
