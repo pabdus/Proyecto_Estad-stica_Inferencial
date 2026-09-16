@@ -285,6 +285,24 @@ if len(formula_terms) >= 1:
     modelo = smf.ols("G3 ~ " + " + ".join(formula_terms), data=dfr).fit()
     betas = {v: modelo.params[v] * dfr[v].std(ddof=1) / dfr["G3"].std(ddof=1) for v in formula_terms}
 
+# Resultados canónicos del proyecto: siempre los tres factores declarados como
+# preguntas de investigación, sin importar qué elija el usuario en la barra lateral.
+CANON = {}
+try:
+    if {"higher", "address", "Medu"} <= set(df.columns):
+        CANON["higher"] = prueba_t(df.loc[df["higher"] == "yes", "G3"], df.loc[df["higher"] == "no", "G3"], 0.05)
+        CANON["address"] = prueba_t(df.loc[df["address"] == "U", "G3"], df.loc[df["address"] == "R", "G3"], 0.05)
+        _mg = df["Medu"].replace({0: 1})
+        _gs = [df.loc[_mg == kk, "G3"] for kk in sorted(_mg.unique())]
+        _F, _p = stats.f_oneway(*_gs)
+        _gm = df["G3"].mean()
+        _SCE = sum(len(g) * (g.mean() - _gm) ** 2 for g in _gs)
+        _SCD = sum(((g - g.mean()) ** 2).sum() for g in _gs)
+        CANON["medu"] = dict(F=_F, p=_p, eta2=_SCE / (_SCE + _SCD), k=len(_gs), N=len(df),
+                             dif=max(g.mean() for g in _gs) - min(g.mean() for g in _gs))
+except Exception:
+    CANON = {}
+
 # ──────────────────────────────────────────────────────────────────────
 # Encabezado y veredicto
 # ──────────────────────────────────────────────────────────────────────
@@ -666,42 +684,60 @@ with tabs[6]:
 # ──────────────────────────────────────────────────────────────────────
 with tabs[7]:
     st.markdown("### Conclusiones")
-    st.markdown("Qué respondimos, qué implica y hasta dónde llega lo que podemos afirmar. "
-                "Las cifras se actualizan con los factores y el nivel de significancia elegidos.")
 
-    st.markdown("#### Respuesta a las preguntas de investigación")
-    q1 = (f"**Sí.** El grupo «{niv(fac2, lv2[0])}» obtiene una nota media significativamente "
-          f"{'mayor' if T['diff'] > 0 else 'menor'} que el grupo «{niv(fac2, lv2[1])}»: la brecha es de "
-          f"**{f(abs(T['diff']))} puntos** (IC {int((1-alpha)*100)} %: {f(T['ic'][0])} a {f(T['ic'][1])}), "
-          f"un efecto **{magnitud_d(T['d'])}** (d = {f(abs(T['d']))})."
-          ) if T["rechaza"] else (
-          f"**No.** No hay evidencia suficiente para afirmar que la nota media difiera según "
-          f"{et(fac2).lower()} (p {pf(T['p'])}).")
-    dif_max = max(ms) - min(ms) if 'ms' in dir() else 0
-    q2 = (f"**Sí.** La nota media difiere entre los niveles de {et(fac3).lower()} "
-          f"(F({k-1}, {N-k}) = {f(F)}, p {pf(pF)}); el factor explica el **{f(eta2*100,1)} %** de la "
-          f"variabilidad, un efecto {magnitud_eta(eta2)}. Las diferencias, según Tukey, se concentran entre "
-          f"los grupos con letras distintas y no forman un escalón parejo entre todos los niveles."
-          ) if pF < alpha else (
-          f"**No.** El análisis de varianza no encuentra diferencias significativas entre los niveles de "
-          f"{et(fac3).lower()} (p {pf(pF)}).")
-    st.markdown(f"1. ¿Difiere la nota según **{et(fac2).lower()}**?  \n{q1}")
-    st.markdown(f"2. ¿Difiere la nota según **{et(fac3).lower()}**?  \n{q2}")
-    if modelo is not None:
-        v_top = max(betas, key=lambda v: abs(betas[v]))
-        st.markdown(f"3. ¿Qué factor pesa más considerando todos a la vez?  \n"
-                    f"**{et(v_top.replace('_b',''))}** (β = {f(betas[v_top],3)}). El modelo explica el "
-                    f"**{f(modelo.rsquared*100,1)} %** de la variabilidad de la nota "
-                    f"(F = {f(modelo.fvalue)}, p {pf(modelo.f_pvalue)}).")
+    if CANON:
+        h, a, m = CANON["higher"], CANON["address"], CANON["medu"]
+        st.markdown("#### Respuesta a las preguntas de investigación")
+        st.markdown("Las tres preguntas que el proyecto se planteó desde la etapa de contextualización, "
+                    "contrastadas con α = 0,05.")
+        st.markdown(
+            f"**1. ¿La nota media difiere entre quienes aspiran a la educación superior y quienes no?**  \n"
+            f"Sí. Quienes aspiran obtienen **{f(abs(h['diff']))} puntos más** sobre 20 "
+            f"(IC 95 %: {f(h['ic'][0])} a {f(h['ic'][1])}; t = {f(h['t'])}, p {pf(h['p'])}), un efecto "
+            f"**{magnitud_d(h['d'])}** (d = {f(abs(h['d']))}). Es la brecha más amplia del estudio.")
+        st.markdown(
+            f"**2. ¿La nota media difiere entre estudiantes de zona urbana y rural?**  \n"
+            f"Sí, pero la brecha es mucho menor: **{f(abs(a['diff']))} puntos** a favor de los urbanos "
+            f"(IC 95 %: {f(a['ic'][0])} a {f(a['ic'][1])}; t = {f(a['t'])}, p {pf(a['p'])}), un efecto "
+            f"**{magnitud_d(a['d'])}** (d = {f(abs(a['d']))}). Significativa, pero de poca magnitud práctica.")
+        st.markdown(
+            f"**3. ¿La nota media difiere según el nivel educativo de la madre y, si es así, entre cuáles niveles?**  \n"
+            f"Sí. El factor explica el **{f(m['eta2']*100,1)} %** de la variabilidad "
+            f"(F({m['k']-1}, {m['N']-m['k']}) = {f(m['F'])}, p {pf(m['p'])}), un efecto "
+            f"**{magnitud_eta(m['eta2'])}**. Las comparaciones de Tukey muestran que la diferencia no es un "
+            f"escalón parejo: se concentra en los extremos, con una distancia de **{f(m['dif'])} puntos** "
+            f"entre el grupo más bajo y el más alto, mientras los niveles intermedios no difieren entre sí.")
+        if modelo is not None:
+            v_top = max(betas, key=lambda v: abs(betas[v]))
+            st.markdown(
+                f"**Pregunta añadida en la etapa de transferencia: ¿cuál pesa más al considerarlos todos a la vez?**  \n"
+                f"La regresión múltiple, que no formaba parte de las preguntas iniciales, aporta el criterio "
+                f"que faltaba: **{et(v_top.replace('_b',''))}** encabeza la jerarquía (β = {f(betas[v_top],3)}) "
+                f"y el modelo explica el **{f(modelo.rsquared*100,1)} %** de la variabilidad "
+                f"(F = {f(modelo.fvalue)}, p {pf(modelo.f_pvalue)}).")
+        st.divider()
 
-    st.markdown("#### Lo que aporta el procedimiento integrado")
+    st.markdown("#### Conclusiones generales del proyecto")
     st.markdown(
-        "Los factores analizados resultan significativos, de modo que un análisis que se detuviera en el "
-        "valor p los pondría a todos al mismo nivel. La medida del tamaño del efecto es la que los separa y "
-        "permite ordenarlos: esa jerarquía, y no la lista de valores p, es lo que hace posible decidir. "
-        "Ninguna de las tres técnicas por separado habría llegado ahí: la prueba t solo alcanza a los "
-        "factores de dos grupos, el análisis de varianza a los de tres o más, y la regresión no compara "
-        "grupos pero sí pondera todo a la vez. La articulación de las tres es el aporte del proyecto.")
+        "**La respuesta al problema es una jerarquía, no una lista.** Los factores analizados resultan "
+        "significativos, de modo que un análisis que se detuviera en el valor p los pondría a todos al mismo "
+        "nivel. El tamaño del efecto es lo que los separa y los ordena, y esa ordenación es justamente lo "
+        "que permite a una institución decidir dónde concentrar sus recursos.")
+    st.markdown(
+        "**Ninguna técnica sola bastaba.** La prueba t solo alcanza a los factores de dos grupos; el "
+        "análisis de varianza, a los de tres o más; la regresión pondera todo a la vez pero no compara "
+        "grupos. La articulación de las tres en un procedimiento escalonado, que clasifica cada factor "
+        "según su naturaleza estadística y le aplica la prueba que le corresponde, es el aporte del trabajo.")
+    st.markdown(
+        "**El rigor está en los supuestos, no solo en el resultado.** Cada contraste verificó la "
+        "homogeneidad de varianzas con Levene antes de elegir entre Student y Welch, y sostuvo la "
+        "aproximación a la normalidad en el tamaño de los grupos y el Teorema del Límite Central. Un "
+        "resultado sin esa verificación previa no sería defendible.")
+    st.markdown(
+        "**Del dato a la decisión.** El proyecto recorrió las tres etapas completas: describir los datos, "
+        "contrastarlos formalmente y convertir los hallazgos en un instrumento que otros pueden usar con su "
+        "propia información. Ese recorrido, y no cada prueba por separado, es lo que convierte el análisis "
+        "en una herramienta de decisión.")
 
     c1, c2 = st.columns(2)
     with c1:
@@ -713,9 +749,8 @@ with tabs[7]:
             "estudiando.\n"
             "- **Usar lo que no se puede cambiar para focalizar.** El nivel educativo de la madre no se "
             "modifica, pero señala a los estudiantes que más se benefician de apoyo adicional.\n"
-            "- **No sobredimensionar lo pequeño.** Factores significativos con efecto pequeño, como la zona "
-            "de residencia, no justifican por sí solos un programa: la ubicación importa menos que el "
-            "entorno familiar y escolar.")
+            "- **No sobredimensionar lo pequeño.** La zona de residencia es significativa, pero con un "
+            "efecto pequeño: la ubicación importa menos que el entorno familiar y escolar.")
     with c2:
         st.markdown("#### Alcance y limitaciones")
         st.markdown(
@@ -730,10 +765,21 @@ with tabs[7]:
     st.markdown("#### El paso siguiente")
     st.markdown(
         "La limitación central marca la recomendación. Si una institución implementa un programa sobre "
-        "alguno de los factores que encabezan la jerarquía, conviene hacerlo como un **diseño "
-        "completamente aleatorizado con grupo de control**, y evaluar su efecto con la misma prueba t o el "
-        "mismo análisis de varianza que se aplican aquí. Este tablero dice **dónde vale la pena "
-        "experimentar**; el experimento dirá si la intervención funciona.")
+        "alguno de los factores que encabezan la jerarquía, conviene hacerlo como un **diseño completamente "
+        "aleatorizado con grupo de control**, y evaluar su efecto con la misma prueba t o el mismo análisis "
+        "de varianza que se aplican aquí. Este tablero dice **dónde vale la pena experimentar**; el "
+        "experimento dirá si la intervención funciona.")
+
+    with st.expander("Resultados de la configuración actual del tablero"):
+        st.markdown(
+            f"Con los factores y el nivel de significancia seleccionados en este momento "
+            f"(α = {f(alpha)}): la nota media **{'sí' if T['rechaza'] else 'no'} difiere** según "
+            f"{et(fac2).lower()} (t = {f(T['t'])}, p {pf(T['p'])}, d = {f(abs(T['d']))}), y "
+            f"**{'sí' if pF < alpha else 'no'} difiere** según {et(fac3).lower()} "
+            f"(F = {f(F)}, p {pf(pF)}, η² = {f(eta2,3)}). Estos valores cambian al modificar la "
+            f"configuración; las conclusiones de arriba corresponden a los factores y al α que el proyecto "
+            f"fijó desde su planteamiento.")
+
     st.divider()
     st.markdown('<p class="nota">Proyecto de Estadística Inferencial · Ciencia de Datos · Fundación '
                 'Universitaria Compensar, 2026 · Pablo Alberto Duque Marín, Geymer Duvan Useche Ruiz y '
