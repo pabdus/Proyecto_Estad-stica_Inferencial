@@ -316,7 +316,7 @@ c4.metric(f"Variabilidad explicada por {et(fac3).lower()}", f"{f(eta2*100,1)} %"
 
 st.markdown("")
 tabs = st.tabs(["Problema y datos", "Descriptivo", "Fase 1 · Prueba t", "Fase 2 · ANOVA",
-                "Fase 3 · Regresión", "Priorización", "Marco teórico"])
+                "Fase 3 · Regresión", "Priorización", "Marco teórico", "Conclusiones"])
 
 # ──────────────────────────────────────────────────────────────────────
 # Pestaña 1: problema y datos
@@ -660,3 +660,81 @@ with tabs[6]:
                 "Proaño Rivera, W. B. (2020). *Estadística descriptiva e inferencial*. Universidad del Azuay. · "
                 "Vladimirovna Panteleeva, O., y Gutiérrez González, E. (2016). *Estadística inferencial 1*. Patria. · "
                 "Walpole, R. E., Myers, R. H., Myers, S. L., y Ye, K. (2011). *Probabilidad y estadística para ingeniería y ciencias*. Pearson.")
+
+# ──────────────────────────────────────────────────────────────────────
+# Pestaña 8: conclusiones
+# ──────────────────────────────────────────────────────────────────────
+with tabs[7]:
+    st.markdown("### Conclusiones")
+    st.markdown("Qué respondimos, qué implica y hasta dónde llega lo que podemos afirmar. "
+                "Las cifras se actualizan con los factores y el nivel de significancia elegidos.")
+
+    st.markdown("#### Respuesta a las preguntas de investigación")
+    q1 = (f"**Sí.** El grupo «{niv(fac2, lv2[0])}» obtiene una nota media significativamente "
+          f"{'mayor' if T['diff'] > 0 else 'menor'} que el grupo «{niv(fac2, lv2[1])}»: la brecha es de "
+          f"**{f(abs(T['diff']))} puntos** (IC {int((1-alpha)*100)} %: {f(T['ic'][0])} a {f(T['ic'][1])}), "
+          f"un efecto **{magnitud_d(T['d'])}** (d = {f(abs(T['d']))})."
+          ) if T["rechaza"] else (
+          f"**No.** No hay evidencia suficiente para afirmar que la nota media difiera según "
+          f"{et(fac2).lower()} (p {pf(T['p'])}).")
+    dif_max = max(ms) - min(ms) if 'ms' in dir() else 0
+    q2 = (f"**Sí.** La nota media difiere entre los niveles de {et(fac3).lower()} "
+          f"(F({k-1}, {N-k}) = {f(F)}, p {pf(pF)}); el factor explica el **{f(eta2*100,1)} %** de la "
+          f"variabilidad, un efecto {magnitud_eta(eta2)}. Las diferencias, según Tukey, se concentran entre "
+          f"los grupos con letras distintas y no forman un escalón parejo entre todos los niveles."
+          ) if pF < alpha else (
+          f"**No.** El análisis de varianza no encuentra diferencias significativas entre los niveles de "
+          f"{et(fac3).lower()} (p {pf(pF)}).")
+    st.markdown(f"1. ¿Difiere la nota según **{et(fac2).lower()}**?  \n{q1}")
+    st.markdown(f"2. ¿Difiere la nota según **{et(fac3).lower()}**?  \n{q2}")
+    if modelo is not None:
+        v_top = max(betas, key=lambda v: abs(betas[v]))
+        st.markdown(f"3. ¿Qué factor pesa más considerando todos a la vez?  \n"
+                    f"**{et(v_top.replace('_b',''))}** (β = {f(betas[v_top],3)}). El modelo explica el "
+                    f"**{f(modelo.rsquared*100,1)} %** de la variabilidad de la nota "
+                    f"(F = {f(modelo.fvalue)}, p {pf(modelo.f_pvalue)}).")
+
+    st.markdown("#### Lo que aporta el procedimiento integrado")
+    st.markdown(
+        "Los factores analizados resultan significativos, de modo que un análisis que se detuviera en el "
+        "valor p los pondría a todos al mismo nivel. La medida del tamaño del efecto es la que los separa y "
+        "permite ordenarlos: esa jerarquía, y no la lista de valores p, es lo que hace posible decidir. "
+        "Ninguna de las tres técnicas por separado habría llegado ahí: la prueba t solo alcanza a los "
+        "factores de dos grupos, el análisis de varianza a los de tres o más, y la regresión no compara "
+        "grupos pero sí pondera todo a la vez. La articulación de las tres es el aporte del proyecto.")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("#### Implicaciones prácticas")
+        st.markdown(
+            "- **Intervenir donde pesa y se puede cambiar.** Las reprobaciones previas y la aspiración a "
+            "continuar estudios encabezan la jerarquía y admiten acción directa: acompañamiento académico "
+            "temprano a quienes ya reprobaron y orientación vocacional para quienes no proyectan seguir "
+            "estudiando.\n"
+            "- **Usar lo que no se puede cambiar para focalizar.** El nivel educativo de la madre no se "
+            "modifica, pero señala a los estudiantes que más se benefician de apoyo adicional.\n"
+            "- **No sobredimensionar lo pequeño.** Factores significativos con efecto pequeño, como la zona "
+            "de residencia, no justifican por sí solos un programa: la ubicación importa menos que el "
+            "entorno familiar y escolar.")
+    with c2:
+        st.markdown("#### Alcance y limitaciones")
+        st.markdown(
+            "- **Asociación, no causalidad.** El diseño es observacional: no permite afirmar que actuar "
+            "sobre un factor cause una mejora. Que quienes aspiran a la universidad rindan más es "
+            "compatible con varias explicaciones, incluida la inversa.\n"
+            "- **Normalidad aproximada.** La nota final tiene asimetría negativa; la validez de las pruebas "
+            "se apoya en el tamaño de los grupos y en la homogeneidad de varianzas verificada.\n"
+            "- **Población acotada.** La inferencia se restringe a estudiantes de secundaria de contextos "
+            "comparables al de la muestra, no a cualquier sistema educativo.")
+
+    st.markdown("#### El paso siguiente")
+    st.markdown(
+        "La limitación central marca la recomendación. Si una institución implementa un programa sobre "
+        "alguno de los factores que encabezan la jerarquía, conviene hacerlo como un **diseño "
+        "completamente aleatorizado con grupo de control**, y evaluar su efecto con la misma prueba t o el "
+        "mismo análisis de varianza que se aplican aquí. Este tablero dice **dónde vale la pena "
+        "experimentar**; el experimento dirá si la intervención funciona.")
+    st.divider()
+    st.markdown('<p class="nota">Proyecto de Estadística Inferencial · Ciencia de Datos · Fundación '
+                'Universitaria Compensar, 2026 · Pablo Alberto Duque Marín, Geymer Duvan Useche Ruiz y '
+                'Lorena Osorio Olaya · Datos: Cortez y Silva (2008).</p>', unsafe_allow_html=True)
